@@ -11,6 +11,59 @@ import { parseTurtle } from "$lib/utils/turtle";
 
 const logger = createLogger("TabsStore");
 
+const STORAGE_TABS_KEY = "carapace_tabs";
+// Legacy: the active tab used to be stored under its own key as well as inside STORAGE_TABS_KEY.
+const LEGACY_ACTIVE_TAB_KEY = "carapace_activeTabId";
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const stringArray = (v: unknown, fallback: string[]): string[] =>
+	Array.isArray(v) && v.every((x) => typeof x === "string") ? [...v] : [...fallback];
+
+function normalizeSettings(raw: unknown): GraphSettings {
+	const d = defaultGraphSettings();
+	if (!isRecord(raw)) return d;
+	return {
+		duplicateExternalNodes:
+			typeof raw.duplicateExternalNodes === "boolean" ? raw.duplicateExternalNodes : d.duplicateExternalNodes,
+		hiddenNamespaces: stringArray(raw.hiddenNamespaces, d.hiddenNamespaces),
+		hiddenEntityTypes: stringArray(
+			raw.hiddenEntityTypes,
+			d.hiddenEntityTypes
+		) as GraphSettings["hiddenEntityTypes"],
+		hiddenPredicateUris: stringArray(raw.hiddenPredicateUris, d.hiddenPredicateUris),
+		hiddenInstanceOfUris: stringArray(raw.hiddenInstanceOfUris, d.hiddenInstanceOfUris),
+		nodeNamePredicate: typeof raw.nodeNamePredicate === "string" ? raw.nodeNamePredicate : d.nodeNamePredicate
+	};
+}
+
+/**
+ * Turns an untrusted object (localStorage or an imported file) into a Tab, filling in defaults and
+ * migrating the legacy `graphState` shape. Returns null when there is no usable Turtle content.
+ * Parsed state is never taken from the input: it is rebuilt from `ttlContent`.
+ */
+function normalizeTab(raw: unknown): Tab | null {
+	if (!isRecord(raw) || typeof raw.ttlContent !== "string") return null;
+
+	const legacy = isRecord(raw.graphState) && !raw.settings ? raw.graphState : null;
+	const settings = legacy
+		? normalizeSettings({ duplicateExternalNodes: legacy.duplicateExternalNodes, nodeNamePredicate: "" })
+		: normalizeSettings(raw.settings);
+	const nodePositions = legacy?.nodePositions ?? raw.nodePositions;
+
+	const tab: Tab = {
+		id: typeof raw.id === "string" && raw.id ? raw.id : crypto.randomUUID(),
+		name: typeof raw.name === "string" && raw.name ? raw.name : "Untitled",
+		ttlContent: raw.ttlContent,
+		settings,
+		locked:
+			typeof (legacy?.locked ?? raw.locked) === "boolean" ? ((legacy?.locked ?? raw.locked) as boolean) : false
+	};
+	if (Array.isArray(nodePositions)) tab.nodePositions = nodePositions as Tab["nodePositions"];
+	if (isRecord(raw.camera)) tab.camera = raw.camera as Tab["camera"];
+	if (typeof raw.editorCursorLine === "number") tab.editorCursorLine = raw.editorCursorLine;
+	return tab;
+}
+
 class TabsStore {
 	tabs = $state<Tab[]>([]);
 	activeTabId = $state<string>("");
@@ -83,7 +136,6 @@ class TabsStore {
 			this.refreshLineMapping();
 		}
 
-		localStorage.setItem("carapace_activeTabId", id);
 		logger.debug("Tab Switched", { id: tab.id, name: tab.name });
 
 		this.scheduleSave();
@@ -263,45 +315,22 @@ class TabsStore {
 
 	loadFromStorage() {
 		try {
-			const stored = localStorage.getItem("carapace_tabs");
+			const stored = localStorage.getItem(STORAGE_TABS_KEY);
 			if (!stored) return;
 
 			const data = JSON.parse(stored);
-			if (!data.tabs || !Array.isArray(data.tabs)) return;
+			if (!isRecord(data) || !Array.isArray(data.tabs)) return;
 
-			this.tabs = data.tabs.map((tab: Record<string, unknown>) => {
-				if (tab.graphState && !tab.settings) {
-					const gs = tab.graphState as Record<string, unknown>;
-					const defaults = defaultGraphSettings();
-					(tab as Record<string, unknown>).locked = (gs.locked as boolean) ?? false;
-					(tab as Record<string, unknown>).nodePositions = gs.nodePositions as
-						| Array<{ id: string; x: number; y: number }>
-						| undefined;
-					tab.settings = {
-						duplicateExternalNodes:
-							(gs.duplicateExternalNodes as boolean) ?? defaults.duplicateExternalNodes,
-						hiddenNamespaces: [...defaults.hiddenNamespaces],
-						hiddenEntityTypes: [...defaults.hiddenEntityTypes],
-						hiddenPredicateUris: [...defaults.hiddenPredicateUris],
-						hiddenInstanceOfUris: [...defaults.hiddenInstanceOfUris],
-						nodeNamePredicate: ""
-					};
-					delete (tab as Record<string, unknown>).graphState;
-				}
-				return tab as Tab;
-			});
+			this.tabs = data.tabs.map(normalizeTab).filter((t): t is Tab => t !== null);
 
-			const separateActive = typeof window !== "undefined" ? localStorage.getItem("carapace_activeTabId") : null;
-			if (separateActive && this.tabs.find((t) => t.id === separateActive)) {
-				this.activeTabId = separateActive;
-			} else if (data.activeTabId && this.tabs.find((t) => t.id === data.activeTabId)) {
-				this.activeTabId = data.activeTabId;
-			} else if (this.tabs.length > 0) {
-				this.activeTabId = this.tabs[0].id;
-			}
+			// The legacy key was written synchronously on every switch, so it is the more recent of the two.
+			const legacyActive = localStorage.getItem(LEGACY_ACTIVE_TAB_KEY);
+			const candidates: unknown[] = [legacyActive, data.activeTabId];
+			const active = candidates.find((id) => this.tabs.some((t) => t.id === id));
+			this.activeTabId = typeof active === "string" ? active : (this.tabs[0]?.id ?? "");
+			if (legacyActive !== null) localStorage.removeItem(LEGACY_ACTIVE_TAB_KEY);
 
-			const activeTab = this.getActiveTab();
-			if (activeTab) this.doParse();
+			if (this.getActiveTab()) this.doParse();
 			logger.info(`Tabs Loaded from Storage - ${this.tabs.length} Tabs`);
 		} catch (error) {
 			logger.error("Tabs Load from Storage:", error);
@@ -319,8 +348,7 @@ class TabsStore {
 		};
 
 		try {
-			localStorage.setItem("carapace_tabs", JSON.stringify(data));
-			localStorage.setItem("carapace_activeTabId", this.activeTabId);
+			localStorage.setItem(STORAGE_TABS_KEY, JSON.stringify(data));
 			logger.debug("Tabs Saved to Storage");
 		} catch (error) {
 			logger.error("Tabs Save to Storage:", error);
@@ -358,16 +386,21 @@ class TabsStore {
 
 	loadJson(json: string) {
 		const data = JSON.parse(json);
-		if (!data.tabs || !Array.isArray(data.tabs)) throw new Error("Invalid JSON: expected { tabs: [...] }");
+		if (!isRecord(data) || !Array.isArray(data.tabs)) throw new Error("Invalid JSON: expected { tabs: [...] }");
 
-		const importedTabs: Tab[] = data.tabs.map((tab: Record<string, unknown>) => ({
-			...(tab as Tab),
-			id: crypto.randomUUID(),
-			locked: true
-		}));
+		const importedTabs: Tab[] = data.tabs
+			.map(normalizeTab)
+			.filter((t: Tab | null): t is Tab => t !== null)
+			.map((tab: Tab) => ({ ...tab, id: crypto.randomUUID(), locked: true }));
+		if (importedTabs.length === 0) throw new Error("Invalid JSON: no tabs with Turtle content");
 
 		this.tabs = [...this.tabs, ...importedTabs];
 		this.activeTabId = importedTabs[0].id;
+		this.activeTriples = null;
+		this.activePrefixMap = {};
+		this.activeLineMapping = null;
+		this.activeError = "";
+		this.graphLoading = true;
 
 		this.doParse();
 		this.scheduleSave();

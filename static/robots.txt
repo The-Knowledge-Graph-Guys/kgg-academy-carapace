@@ -2,4 +2,4 @@
 User-agent: *
 Disallow:
 
-Sitemap: https://carapace.space/sitemap.xml
+Sitemap: https://the-knowledge-graph-guys.github.io/kgg-academy-carapace/sitemap.xml

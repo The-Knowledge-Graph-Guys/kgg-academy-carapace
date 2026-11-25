@@ -7,6 +7,8 @@
 
 <p align="center"><strong>Turtle (TTL) ontology editor and graph visualiser, for the KGG Academy.</strong></p>
 
+<p align="center"><a href="https://the-knowledge-graph-guys.github.io/kgg-academy-carapace/"><strong>Open the hosted app</strong></a></p>
+
 **Carapace** is a text-first TTL graph visualiser. Easily import, export, navigate and edit TTL-based graphs through a native code editor, with live updates reflecting in the visualisation. Force graph computations are used to automatically spread out nodes, which can be manually arranged to your liking. The visualiser recognises [OWL (Web Ontology Language)](https://www.w3.org/OWL/) entity types, and also provides custom rendering for various concepts to improve readability.
 
 <p align="center">

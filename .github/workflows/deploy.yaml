@@ -74,6 +74,8 @@ jobs:
             # A failed release must not block deploying the site to students; the
             # header then shows the last tag (or 0.0.0 if none can be found).
             - name: Semantic Release
+              # A failed release (e.g. no releasable commits) must not block the Pages deploy;
+              # the version then falls back to the latest existing tag below.
               continue-on-error: true
               run: pnpm semantic-release
               env:

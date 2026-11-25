@@ -44,10 +44,21 @@ function buildExportSvg(
 		w: n.width * transform.k,
 		h: n.height * transform.k
 	}));
-	const minX = Math.min(...dims.map((d) => d.x)) - padding;
-	const minY = Math.min(...dims.map((d) => d.y)) - padding;
-	const maxX = Math.max(...dims.map((d) => d.x + d.w)) + padding;
-	const maxY = Math.max(...dims.map((d) => d.y + d.h)) + padding;
+	// reduce instead of Math.min(...array): spreading a very large node list overflows the call stack
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+	for (const d of dims) {
+		minX = Math.min(minX, d.x);
+		minY = Math.min(minY, d.y);
+		maxX = Math.max(maxX, d.x + d.w);
+		maxY = Math.max(maxY, d.y + d.h);
+	}
+	minX -= padding;
+	minY -= padding;
+	maxX += padding;
+	maxY += padding;
 
 	const rootEl = document.documentElement;
 	const wasDark = rootEl.classList.contains("dark");

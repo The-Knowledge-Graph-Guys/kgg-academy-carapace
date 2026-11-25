@@ -5,10 +5,9 @@ on:
         branches: [main]
     workflow_dispatch: # allows manual running on GitHub Actions
 
+# Least privilege by default; jobs that need more declare it themselves.
 permissions:
-    contents: write
-    pages: write
-    id-token: write
+    contents: read
 
 concurrency:
     group: "pages"
@@ -17,6 +16,8 @@ concurrency:
 jobs:
     test:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
         steps:
             - name: Checkout
               uses: actions/checkout@v7
@@ -35,12 +36,21 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
+            - name: Lint
+              run: pnpm lint
+
+            - name: Type check
+              run: pnpm check
+
             - name: Run tests
               run: pnpm test
 
     build:
         needs: test
         runs-on: ubuntu-latest
+        permissions:
+            contents: write # semantic-release creates tags and releases
+            pages: write
         steps:
             - name: Checkout
               uses: actions/checkout@v7
@@ -61,12 +71,16 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
+            # A failed release must not block deploying the site to students; the
+            # header then shows the last tag (or 0.0.0 if none can be found).
             - name: Semantic Release
               continue-on-error: true
               run: pnpm semantic-release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+            # VERSION is read by vite.config.ts (process.env.VERSION) during the
+            # Build step below, so this step and Build must stay in the same job.
             - name: Set Version from Tag
               run: echo "VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.0')" >> $GITHUB_ENV
 
@@ -86,6 +100,9 @@ jobs:
     deploy:
         needs: build
         runs-on: ubuntu-latest
+        permissions:
+            pages: write
+            id-token: write
 
         environment:
             name: github-pages

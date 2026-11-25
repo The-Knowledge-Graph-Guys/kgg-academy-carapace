@@ -3,3 +3,7 @@ packages:
 
 allowBuilds:
     esbuild: true
+
+overrides:
+    cookie: "^0.7.0"
+    devalue: "^5.9.3"

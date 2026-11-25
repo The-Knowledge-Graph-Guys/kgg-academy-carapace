@@ -29,7 +29,11 @@
 		<span class="text-muted-foreground">{__APP_VERSION__}</span>
 
 		<div class="ml-auto flex items-center gap-1">
-			<a href="https://github.com/sellsol/carapace" target="_blank" rel="noopener noreferrer">
+			<a
+				href="https://github.com/The-Knowledge-Graph-Guys/kgg-academy-carapace"
+				target="_blank"
+				rel="noopener noreferrer"
+			>
 				<Button size="sm" variant="ghost" class="h-8 w-8 px-0">
 					<!-- official Github logo SVG code -->
 					<svg width="98" height="96" viewBox="0 0 98 96" fill="none" xmlns="http://www.w3.org/2000/svg">

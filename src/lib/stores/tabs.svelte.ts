@@ -157,14 +157,24 @@ class TabsStore {
 			return;
 		}
 
+		// Deep copy plain data so the copy never shares settings/positions with the original.
+		// Parsed state is dropped and rebuilt from the content by doParse().
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		const { parsedTriples, parsedPrefixMap, lineMapping, ...rest } = tab;
 		const newTab: Tab = {
-			...tab,
+			...$state.snapshot(rest),
 			id: crypto.randomUUID(),
 			name: `${tab.name} copy`
 		};
 
 		this.tabs.push(newTab);
 		this.activeTabId = newTab.id;
+		this.activeTriples = null;
+		this.activePrefixMap = {};
+		this.activeLineMapping = null;
+		this.activeError = "";
+		this.graphLoading = true;
+		this.doParse();
 		logger.debug("Tab Duplicated", { id: id, oldName: tab.name, newName: newTab.name });
 
 		this.scheduleSave();

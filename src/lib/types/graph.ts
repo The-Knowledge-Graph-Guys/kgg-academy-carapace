@@ -40,6 +40,4 @@ export type Edge = {
 	collectionEdge: boolean;
 };
 
-export type GraphSearchResult =
-	| { kind: "node"; node: Node }
-	| { kind: "edge"; edge: Edge };
+export type GraphSearchResult = { kind: "node"; node: Node } | { kind: "edge"; edge: Edge };

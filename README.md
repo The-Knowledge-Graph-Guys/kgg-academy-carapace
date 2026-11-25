@@ -26,7 +26,7 @@
 - **Graph Controls:** Pan, zoom and scroll within the graph visualisation. Drag nodes to manually rearrange. Box select or ctrl/cmd + click to move multiple nodes at once. Lock node positions to maintain a manually arranged layout.
 - **Fine-Grained Visualiser Settings:** Toggle visibility of nodes by entity types, and blacklist namespaces, predicates, or instances of types.
 - **Search and Node-Line Mappings:** Searchbars in both the graph and editor. Buttons on the separator allow for line-to-node and node-to-line jumps based on selected cursor line or selected node.
-- **Export as SVG:** Export to a high-quality visualisation that fits to the graph's bounding box.
+- **Export as SVG, PNG or JPG:** Export the visualisation, fitted to the graph's bounding box.
 - **Export/ Import State:** Export and import the state of TTL, graph and settings together to pick up exactly where you left off.
 - **Light/ Dark Mode:** Good looking light and dark modes.
 

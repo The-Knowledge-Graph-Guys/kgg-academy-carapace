@@ -6,8 +6,11 @@ import { createLogger } from "$lib/logger";
 
 const logger = createLogger("rdfxml");
 
-function extractXmlPrefixes(content: string): Record<string, string> {
+export function extractXmlPrefixes(content: string): Record<string, string> {
 	const prefixes: Record<string, string> = {};
+
+	// Ignore xmlns text inside comments and CDATA sections
+	content = content.replace(/<!--[\s\S]*?-->/g, "").replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, "");
 
 	const xmlnsRegex = /xmlns(:\w[\w.-]*)?\s*=\s*(["'])(.*?)\2/g;
 	for (const match of content.matchAll(xmlnsRegex)) {
